@@ -14,6 +14,13 @@ const OceanCarbonAI = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
   const [numSites, setNumSites] = useState(150);
+  
+  // CHAT STATE
+  const [chatMessages, setChatMessages] = useState([
+    { role: 'assistant', content: 'Ask me anything about ocean carbon removal sites! I can help you understand the data, compare sites, or explain why certain locations are optimal for your project.' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   // SPHINX AI ANALYSIS FUNCTION
   const handleRunAnalysis = async () => {
@@ -101,6 +108,55 @@ const OceanCarbonAI = () => {
       alert('Analysis failed. Please check console for details.');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  // CHAT WITH CLAUDE API
+  const handleSendMessage = async () => {
+    if (!chatInput.trim()) return;
+    
+    const userMessage = { role: 'user', content: chatInput };
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatLoading(true);
+    
+    try {
+      // Build context from current state
+      const context = {
+        region: selectedRegion,
+        projectType: selectedProjectType,
+        analysisResults: analysisResults?.slice(0, 5), // Top 5 sites for context
+        currentMetrics: getMetricsForProjectType(selectedProjectType)
+      };
+      
+      // Call backend chat endpoint
+      const response = await fetch('http://localhost:5001/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...chatMessages, userMessage],
+          context: context
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Chat request failed');
+      }
+      
+      const data = await response.json();
+      const assistantMessage = { role: 'assistant', content: data.message };
+      
+      setChatMessages(prev => [...prev, assistantMessage]);
+      
+    } catch (error) {
+      console.error('❌ Chat error:', error);
+      const errorMessage = { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please make sure the backend is running and try again.' 
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -266,11 +322,11 @@ const OceanCarbonAI = () => {
   };
 
   const sourcesList = [
-    { name: 'NOAA Ocean Data', type: 'Temperature & Salinity', updated: '2024-11-10' },
-    { name: 'NASA Ocean Color', type: 'Chlorophyll & Productivity', updated: '2024-11-12' },
-    { name: 'AlphaEarth Embeddings', type: 'Multi-spectral Analysis', updated: '2024-11-14' },
-    { name: 'GEBCO Bathymetry', type: 'Depth & Topography', updated: '2024-10-15' },
-    { name: 'NOAA Storm Database', type: 'Historical Storm Events', updated: '2024-11-08' },
+    { name: 'NOAA Ocean Data', type: 'Temperature & Salinity', updated: '2024-11-10', url: 'https://www.ncei.noaa.gov/products/climate-data-records' },
+    { name: 'NASA Ocean Color', type: 'Chlorophyll & Productivity', updated: '2024-11-12', url: 'https://oceancolor.gsfc.nasa.gov/' },
+    { name: 'AlphaEarth Embeddings', type: 'Multi-spectral Analysis', updated: '2024-11-14', url: 'https://alphaearth.ai/' },
+    { name: 'GEBCO Bathymetry', type: 'Depth & Topography', updated: '2024-10-15', url: 'https://www.gebco.net/' },
+    { name: 'NOAA Storm Database', type: 'Historical Storm Events', updated: '2024-11-08', url: 'https://www.ncdc.noaa.gov/stormevents/' },
   ];
 
   return (
@@ -539,10 +595,21 @@ const OceanCarbonAI = () => {
               <h2 className="text-2xl font-bold text-slate-800 mb-6">Data Sources</h2>
               <div className="space-y-4">
                 {sourcesList.map((source, idx) => (
-                  <div key={idx} className="border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all hover:border-cyan-300">
+                  <a
+                    key={idx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block border border-slate-200 rounded-lg p-5 hover:shadow-lg hover:border-cyan-400 transition-all cursor-pointer"
+                  >
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-lg mb-1">{source.name}</h3>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold text-slate-800 text-lg">{source.name}</h3>
+                          <svg className="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </div>
                         <p className="text-slate-600">{source.type}</p>
                       </div>
                       <div className="text-right">
@@ -550,7 +617,7 @@ const OceanCarbonAI = () => {
                         <div className="text-sm font-medium text-cyan-600">{source.updated}</div>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
 
@@ -781,16 +848,66 @@ const OceanCarbonAI = () => {
         </div>
 
         {/* Chat Interface */}
-        <div className="fixed bottom-6 right-6 w-96">
+        <div className="fixed bottom-6 right-6 w-96 z-50">
           <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-2xl shadow-2xl p-6">
-            <div className="bg-white rounded-xl p-4 mb-3 max-h-48 overflow-y-auto">
-              <p className="text-sm text-slate-600 italic">Ask me anything about ocean carbon removal sites...</p>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                </svg>
+                AI Assistant
+              </h3>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-slate-600">Online</span>
+              </div>
             </div>
-            <input
-              type="text"
-              placeholder="Type smth here..."
-              className="w-full px-4 py-3 rounded-xl border-2 border-orange-300 focus:outline-none focus:border-orange-400 text-slate-700"
-            />
+            
+            <div className="bg-white rounded-xl p-4 mb-3 h-64 overflow-y-auto">
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  <div className={`inline-block max-w-[85%] px-4 py-2 rounded-lg ${
+                    msg.role === 'user' 
+                      ? 'bg-cyan-500 text-white rounded-br-none' 
+                      : 'bg-slate-100 text-slate-800 rounded-bl-none'
+                  }`}>
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {isChatLoading && (
+                <div className="text-left mb-3">
+                  <div className="inline-block bg-slate-100 px-4 py-2 rounded-lg rounded-bl-none">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Ask about ocean sites..."
+                disabled={isChatLoading}
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-orange-300 focus:outline-none focus:border-orange-400 text-slate-700 disabled:opacity-50"
+              />
+              <button 
+                onClick={handleSendMessage}
+                disabled={isChatLoading || !chatInput.trim()}
+                className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 rounded-xl transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
