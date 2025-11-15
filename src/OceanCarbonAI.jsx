@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+// import { analyzeSite, rankSites } from './services/api';  // Uncomment when backend is ready
 
 const OceanCarbonAI = () => {
   const [selectedRegion, setSelectedRegion] = useState('Monterey coast');
@@ -8,6 +9,100 @@ const OceanCarbonAI = () => {
   const [selectedSites, setSelectedSites] = useState(['Serie 1', 'Serie 2', 'Serie 3']);
   const [showSiteDropdown, setShowSiteDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  
+  // NEW STATE FOR SPHINX AI INTEGRATION
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState(null);
+  const [numSites, setNumSites] = useState(150);
+
+  // SPHINX AI ANALYSIS FUNCTION
+  const handleRunAnalysis = async () => {
+    setIsAnalyzing(true);
+    
+    try {
+      // Define sites to analyze based on selected region
+      const regionSites = {
+        'Monterey': [
+          { id: 1, name: 'Monterey Bay North', lat: 36.8, lon: -121.9 },
+          { id: 2, name: 'Carmel Bay', lat: 36.5, lon: -121.95 },
+          { id: 3, name: 'Point Lobos', lat: 36.52, lon: -121.95 },
+          { id: 4, name: 'Big Sur Coast', lat: 36.3, lon: -121.85 },
+          { id: 5, name: 'Monterey Canyon Edge', lat: 36.75, lon: -122.0 },
+          { id: 6, name: 'Moss Landing', lat: 36.81, lon: -121.78 },
+          { id: 7, name: 'Pacific Grove Shore', lat: 36.62, lon: -121.92 },
+          { id: 8, name: 'Elkhorn Slough', lat: 36.82, lon: -121.75 },
+          { id: 9, name: 'Lovers Point', lat: 36.63, lon: -121.91 },
+          { id: 10, name: 'Point Pinos', lat: 36.64, lon: -121.93 },
+        ],
+        'Miami': [
+          { id: 1, name: 'Biscayne Bay', lat: 25.75, lon: -80.15 },
+          { id: 2, name: 'Key Largo North', lat: 25.1, lon: -80.4 },
+          { id: 3, name: 'Miami Beach Offshore', lat: 25.8, lon: -80.1 },
+          { id: 4, name: 'Key Biscayne', lat: 25.69, lon: -80.16 },
+          { id: 5, name: 'Haulover Park', lat: 25.90, lon: -80.12 },
+          { id: 6, name: 'Virginia Key', lat: 25.73, lon: -80.17 },
+          { id: 7, name: 'Fisher Island', lat: 25.76, lon: -80.14 },
+          { id: 8, name: 'Key West Approach', lat: 24.55, lon: -81.80 },
+          { id: 9, name: 'Marathon Key', lat: 24.72, lon: -81.09 },
+          { id: 10, name: 'Islamorada Coast', lat: 24.92, lon: -80.62 },
+        ],
+        'Brazil': [
+          { id: 1, name: 'Fernando de Noronha', lat: -3.85, lon: -32.4 },
+          { id: 2, name: 'Abrolhos Bank', lat: -18.0, lon: -38.7 },
+          { id: 3, name: 'Recife Coast', lat: -8.05, lon: -34.87 },
+          { id: 4, name: 'Salvador Bay', lat: -12.97, lon: -38.52 },
+          { id: 5, name: 'Buzios Peninsula', lat: -22.75, lon: -41.88 },
+          { id: 6, name: 'Ilha Grande', lat: -23.14, lon: -44.23 },
+          { id: 7, name: 'Paraty Coast', lat: -23.22, lon: -44.72 },
+          { id: 8, name: 'Ubatuba Bay', lat: -23.43, lon: -45.08 },
+          { id: 9, name: 'Ilhabela', lat: -23.78, lon: -45.35 },
+          { id: 10, name: 'Santos Offshore', lat: -23.96, lon: -46.33 },
+        ]
+      };
+      
+      const sitesToAnalyze = regionSites[selectedRegion] || regionSites['Monterey'];
+      
+      console.log(`🚀 Starting Sphinx AI analysis for ${sitesToAnalyze.length} sites...`);
+      console.log(`📍 Region: ${selectedRegion}`);
+      console.log(`🔬 Project Type: ${selectedProjectType}`);
+      
+      // TODO: Uncomment when backend is ready
+      // const rankedSites = await rankSites(sitesToAnalyze, selectedProjectType);
+      
+      // MOCK DATA FOR NOW - Replace with real Sphinx AI results
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+      
+      const mockResults = sitesToAnalyze.map((site, idx) => {
+        // Generate realistic-looking scores based on project type
+        const baseScore = 95 - (idx * 3) - Math.random() * 5;
+        const score = Math.max(70, Math.min(100, Math.round(baseScore)));
+        
+        return {
+          ...site,
+          rank: idx + 1,
+          score: score,
+          analysis: {
+            strengths: [
+              'High productivity indicators',
+              'Optimal temperature range',
+              'Protected from storms',
+              'Good water circulation'
+            ].slice(0, 2 + Math.floor(Math.random() * 2)),
+            concerns: idx > 5 ? ['Moderate wave exposure'] : []
+          }
+        };
+      });
+      
+      console.log('✅ Analysis complete!', mockResults);
+      setAnalysisResults(mockResults);
+      
+    } catch (error) {
+      console.error('❌ Analysis failed:', error);
+      alert('Analysis failed. Please check console for details.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // Sample data for visualizations
   const radarData = [
@@ -261,6 +356,41 @@ const OceanCarbonAI = () => {
             )}
           </div>
 
+          {/* Run Analysis Button */}
+          <button
+            onClick={handleRunAnalysis}
+            disabled={isAnalyzing}
+            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-bold text-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+          >
+            {isAnalyzing ? (
+              <>
+                <div className="inline-block animate-spin h-5 w-5 border-3 border-white border-t-transparent rounded-full" />
+                Analyzing with Sphinx AI...
+              </>
+            ) : (
+              <>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                Run AI Analysis
+              </>
+            )}
+          </button>
+
+          {/* Number of Sites Slider */}
+          <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-lg">
+            <span className="text-slate-700 font-medium text-sm">Sites:</span>
+            <input 
+              type="range" 
+              min="10" 
+              max="500" 
+              value={numSites}
+              onChange={(e) => setNumSites(e.target.value)}
+              className="w-32"
+            />
+            <span className="text-slate-700 font-bold text-sm">{numSites}</span>
+          </div>
+
           {/* Tab Navigation */}
           <div className="flex gap-2">
             {['Visualizations', 'Ocean chemistry', 'Sources', 'Comparison'].map(tab => (
@@ -506,6 +636,115 @@ const OceanCarbonAI = () => {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* SPHINX AI ANALYSIS RESULTS */}
+          {analysisResults && (
+            <div className="bg-white rounded-xl shadow-md p-8 mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-800">
+                  🎯 AI Analysis Results - Top {analysisResults.length} Sites
+                </h2>
+                <button
+                  onClick={() => {
+                    // Export to CSV
+                    const csv = [
+                      ['Rank', 'Site Name', 'Latitude', 'Longitude', 'Score', 'Project Type'],
+                      ...analysisResults.map((site) => [
+                        site.rank,
+                        site.name,
+                        site.lat,
+                        site.lon,
+                        site.score,
+                        selectedProjectType
+                      ])
+                    ].map(row => row.join(',')).join('\n');
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `ocean-sites-${selectedRegion}-${Date.now()}.csv`;
+                    a.click();
+                  }}
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export CSV
+                </button>
+              </div>
+
+              {/* Results Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-cyan-50 to-blue-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-bold text-slate-700">Rank</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-700">Location</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-700">Coordinates</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-700">Suitability Score</th>
+                      <th className="px-4 py-3 text-left font-bold text-slate-700">Key Strengths</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analysisResults.slice(0, 10).map((site, idx) => (
+                      <tr key={site.id || idx} className="border-b hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${
+                            idx === 0 ? 'bg-yellow-500' :
+                            idx === 1 ? 'bg-gray-400' :
+                            idx === 2 ? 'bg-orange-600' :
+                            'bg-cyan-500'
+                          }`}>
+                            {idx + 1}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 font-semibold text-slate-800">{site.name}</td>
+                        <td className="px-4 py-4 text-sm text-slate-600 font-mono">
+                          {site.lat.toFixed(3)}, {site.lon.toFixed(3)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 bg-slate-200 rounded-full h-3 max-w-[120px]">
+                              <div 
+                                className={`h-3 rounded-full transition-all ${
+                                  site.score >= 90 ? 'bg-green-500' :
+                                  site.score >= 80 ? 'bg-cyan-500' :
+                                  'bg-yellow-500'
+                                }`}
+                                style={{ width: `${site.score}%` }}
+                              />
+                            </div>
+                            <span className="font-bold text-slate-800 min-w-[3ch]">{site.score}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {site.analysis?.strengths?.slice(0, 2).join(', ') || 'Analyzing...'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Analysis Summary */}
+              <div className="mt-6 bg-gradient-to-r from-cyan-50 to-blue-50 border-l-4 border-cyan-500 rounded-lg p-6">
+                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-cyan-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z"/>
+                  </svg>
+                  Sphinx AI Strategic Recommendation:
+                </h3>
+                <p className="text-slate-700">
+                  Based on the analysis of {analysisResults.length} sites in {selectedRegion} for {selectedProjectType}, 
+                  <strong> {analysisResults[0]?.name}</strong> ranks highest with a score of <strong>{analysisResults[0]?.score}/100</strong>. 
+                  This site offers optimal conditions for deployment with minimal environmental risks. 
+                  We recommend prioritizing the top 3 sites for field surveys and pilot deployment.
+                </p>
               </div>
             </div>
           )}

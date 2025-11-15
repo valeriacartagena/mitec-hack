@@ -1,0 +1,11 @@
+# API Keys and secrets
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Jupyter notebooks
+notebooks/
+*.ipynb_checkpoints
