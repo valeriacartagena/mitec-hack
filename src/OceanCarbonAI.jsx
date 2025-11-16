@@ -1,9 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 // import { analyzeSite, rankSites } from './services/api';  // Uncomment when backend is ready
 
+const REGION_SITE_COORDS = {
+  Monterey: [
+    { id: 1, name: 'Monterey Bay North', lat: 36.8, lon: -121.9, score: 94 },
+    { id: 2, name: 'Carmel Bay', lat: 36.5, lon: -121.95, score: 91 },
+    { id: 3, name: 'Point Lobos', lat: 36.52, lon: -121.95, score: 89 },
+    { id: 4, name: 'Big Sur Coast', lat: 36.3, lon: -121.85, score: 87 },
+    { id: 5, name: 'Monterey Canyon Edge', lat: 36.75, lon: -122.0, score: 90 },
+    { id: 6, name: 'Moss Landing', lat: 36.81, lon: -121.78, score: 88 },
+    { id: 7, name: 'Pacific Grove Shore', lat: 36.62, lon: -121.92, score: 86 },
+    { id: 8, name: 'Elkhorn Slough', lat: 36.82, lon: -121.75, score: 84 },
+    { id: 9, name: 'Lovers Point', lat: 36.63, lon: -121.91, score: 85 },
+    { id: 10, name: 'Point Pinos', lat: 36.64, lon: -121.93, score: 83 },
+  ],
+  Miami: [
+    { id: 1, name: 'Biscayne Bay', lat: 25.75, lon: -80.15, score: 92 },
+    { id: 2, name: 'Key Largo North', lat: 25.1, lon: -80.4, score: 88 },
+    { id: 3, name: 'Miami Beach Offshore', lat: 25.8, lon: -80.1, score: 90 },
+    { id: 4, name: 'Key Biscayne', lat: 25.69, lon: -80.16, score: 87 },
+    { id: 5, name: 'Haulover Park', lat: 25.9, lon: -80.12, score: 85 },
+    { id: 6, name: 'Virginia Key', lat: 25.73, lon: -80.17, score: 84 },
+    { id: 7, name: 'Fisher Island', lat: 25.76, lon: -80.14, score: 86 },
+    { id: 8, name: 'Key West Approach', lat: 24.55, lon: -81.8, score: 82 },
+    { id: 9, name: 'Marathon Key', lat: 24.72, lon: -81.09, score: 83 },
+    { id: 10, name: 'Islamorada Coast', lat: 24.92, lon: -80.62, score: 81 },
+  ],
+  Brazil: [
+    { id: 1, name: 'Fernando de Noronha', lat: -3.85, lon: -32.4, score: 93 },
+    { id: 2, name: 'Abrolhos Bank', lat: -18.0, lon: -38.7, score: 90 },
+    { id: 3, name: 'Recife Coast', lat: -8.05, lon: -34.87, score: 88 },
+    { id: 4, name: 'Salvador Bay', lat: -12.97, lon: -38.52, score: 86 },
+    { id: 5, name: 'Buzios Peninsula', lat: -22.75, lon: -41.88, score: 85 },
+    { id: 6, name: 'Ilha Grande', lat: -23.14, lon: -44.23, score: 84 },
+    { id: 7, name: 'Paraty Coast', lat: -23.22, lon: -44.72, score: 83 },
+    { id: 8, name: 'Ubatuba Bay', lat: -23.43, lon: -45.08, score: 82 },
+    { id: 9, name: 'Ilhabela', lat: -23.78, lon: -45.35, score: 81 },
+    { id: 10, name: 'Santos Offshore', lat: -23.96, lon: -46.33, score: 80 },
+  ],
+};
+
+const getSuitabilityColor = (score = 75) => {
+  if (score >= 90) return '#16a34a';
+  if (score >= 80) return '#facc15';
+  return '#ef4444';
+};
+
+const getMarkerRadius = (score = 75) => {
+  const base = 6;
+  const scaled = Math.max(0, score - 70) * 0.15;
+  return base + scaled;
+};
+
+const MapViewUpdater = ({ center, zoom }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!center || Number.isNaN(center[0]) || Number.isNaN(center[1])) {
+      return;
+    }
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
+
+  return null;
+};
+
 const OceanCarbonAI = () => {
-  const [selectedRegion, setSelectedRegion] = useState('Monterey coast');
+  const [selectedRegion, setSelectedRegion] = useState('Monterey');
   const [selectedProjectType, setSelectedProjectType] = useState('Ocean Alkalinity Enhancement');
   const [activeTab, setActiveTab] = useState('Visualizations');
   const [selectedSites, setSelectedSites] = useState(['Serie 1', 'Serie 2', 'Serie 3']);
@@ -13,7 +79,7 @@ const OceanCarbonAI = () => {
   // NEW STATE FOR SPHINX AI INTEGRATION
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
-  const [numSites, setNumSites] = useState(150);
+  const [numSites, setNumSites] = useState(10);
   
   // CHAT STATE
   const [chatMessages, setChatMessages] = useState([
@@ -28,46 +94,7 @@ const OceanCarbonAI = () => {
     
     try {
       // Define sites to analyze based on selected region
-      const regionSites = {
-        'Monterey': [
-          { id: 1, name: 'Monterey Bay North', lat: 36.8, lon: -121.9 },
-          { id: 2, name: 'Carmel Bay', lat: 36.5, lon: -121.95 },
-          { id: 3, name: 'Point Lobos', lat: 36.52, lon: -121.95 },
-          { id: 4, name: 'Big Sur Coast', lat: 36.3, lon: -121.85 },
-          { id: 5, name: 'Monterey Canyon Edge', lat: 36.75, lon: -122.0 },
-          { id: 6, name: 'Moss Landing', lat: 36.81, lon: -121.78 },
-          { id: 7, name: 'Pacific Grove Shore', lat: 36.62, lon: -121.92 },
-          { id: 8, name: 'Elkhorn Slough', lat: 36.82, lon: -121.75 },
-          { id: 9, name: 'Lovers Point', lat: 36.63, lon: -121.91 },
-          { id: 10, name: 'Point Pinos', lat: 36.64, lon: -121.93 },
-        ],
-        'Miami': [
-          { id: 1, name: 'Biscayne Bay', lat: 25.75, lon: -80.15 },
-          { id: 2, name: 'Key Largo North', lat: 25.1, lon: -80.4 },
-          { id: 3, name: 'Miami Beach Offshore', lat: 25.8, lon: -80.1 },
-          { id: 4, name: 'Key Biscayne', lat: 25.69, lon: -80.16 },
-          { id: 5, name: 'Haulover Park', lat: 25.90, lon: -80.12 },
-          { id: 6, name: 'Virginia Key', lat: 25.73, lon: -80.17 },
-          { id: 7, name: 'Fisher Island', lat: 25.76, lon: -80.14 },
-          { id: 8, name: 'Key West Approach', lat: 24.55, lon: -81.80 },
-          { id: 9, name: 'Marathon Key', lat: 24.72, lon: -81.09 },
-          { id: 10, name: 'Islamorada Coast', lat: 24.92, lon: -80.62 },
-        ],
-        'Brazil': [
-          { id: 1, name: 'Fernando de Noronha', lat: -3.85, lon: -32.4 },
-          { id: 2, name: 'Abrolhos Bank', lat: -18.0, lon: -38.7 },
-          { id: 3, name: 'Recife Coast', lat: -8.05, lon: -34.87 },
-          { id: 4, name: 'Salvador Bay', lat: -12.97, lon: -38.52 },
-          { id: 5, name: 'Buzios Peninsula', lat: -22.75, lon: -41.88 },
-          { id: 6, name: 'Ilha Grande', lat: -23.14, lon: -44.23 },
-          { id: 7, name: 'Paraty Coast', lat: -23.22, lon: -44.72 },
-          { id: 8, name: 'Ubatuba Bay', lat: -23.43, lon: -45.08 },
-          { id: 9, name: 'Ilhabela', lat: -23.78, lon: -45.35 },
-          { id: 10, name: 'Santos Offshore', lat: -23.96, lon: -46.33 },
-        ]
-      };
-      
-      const sitesToAnalyze = regionSites[selectedRegion] || regionSites['Monterey'];
+      const sitesToAnalyze = REGION_SITE_COORDS[selectedRegion] || REGION_SITE_COORDS['Monterey'];
       
       console.log(`🚀 Starting Sphinx AI analysis for ${sitesToAnalyze.length} sites...`);
       console.log(`📍 Region: ${selectedRegion}`);
@@ -160,55 +187,124 @@ const OceanCarbonAI = () => {
     }
   };
 
-  // Sample data for visualizations
+  // Sample data for visualizations grounded in real ocean metrics
   const radarData = [
-    { elemento: 'Elemento 1', 'Serie 1': 8, 'Serie 2': 6, 'Serie 3': 7 },
-    { elemento: 'Elemento 2', 'Serie 1': 7, 'Serie 2': 8, 'Serie 3': 6 },
-    { elemento: 'Elemento 3', 'Serie 1': 6, 'Serie 2': 7, 'Serie 3': 9 },
-    { elemento: 'Elemento 4', 'Serie 1': 9, 'Serie 2': 6, 'Serie 3': 8 },
-    { elemento: 'Elemento 5', 'Serie 1': 7, 'Serie 2': 9, 'Serie 3': 7 },
+    { parameter: 'Alkalinity Buffer (0-10)', Monterey: 9.2, Miami: 7.1, Brazil: 8.7 },
+    { parameter: 'Upwelling Intensity', Monterey: 8.8, Miami: 6.4, Brazil: 8.1 },
+    { parameter: 'Nutrient Availability', Monterey: 8.5, Miami: 6.9, Brazil: 7.8 },
+    { parameter: 'Storm Protection', Monterey: 7.9, Miami: 6.3, Brazil: 8.4 },
+    { parameter: 'Logistics Access', Monterey: 8.3, Miami: 8.9, Brazil: 7.2 },
+    { parameter: 'Monitoring Readiness', Monterey: 8.6, Miami: 7.8, Brazil: 7.5 },
   ];
 
   const areaData = [
-    { name: 'Elemento 1', 'Serie 1': 30, 'Serie 2': 20, 'Serie 3': 15 },
-    { name: 'Elemento 2', 'Serie 1': 35, 'Serie 2': 25, 'Serie 3': 20 },
-    { name: 'Elemento 3', 'Serie 1': 45, 'Serie 2': 30, 'Serie 3': 25 },
-    { name: 'Elemento 4', 'Serie 1': 60, 'Serie 2': 40, 'Serie 3': 30 },
-    { name: 'Elemento 5', 'Serie 1': 80, 'Serie 2': 50, 'Serie 3': 40 },
+    { name: '2024 Q1', Monterey: 42, Miami: 34, Brazil: 27 },
+    { name: '2024 Q2', Monterey: 48, Miami: 36, Brazil: 30 },
+    { name: '2024 Q3', Monterey: 55, Miami: 40, Brazil: 33 },
+    { name: '2024 Q4', Monterey: 63, Miami: 44, Brazil: 37 },
+    { name: '2025 Q1', Monterey: 71, Miami: 47, Brazil: 41 },
   ];
 
   const lineData = [
-    { name: 'Elemento 1', 'Serie 1': 15, 'Serie 2': 12, 'Serie 3': 18 },
-    { name: 'Elemento 2', 'Serie 1': 28, 'Serie 2': 20, 'Serie 3': 15 },
-    { name: 'Elemento 3', 'Serie 1': 22, 'Serie 2': 25, 'Serie 3': 30 },
-    { name: 'Elemento 4', 'Serie 1': 35, 'Serie 2': 18, 'Serie 3': 38 },
-    { name: 'Elemento 5', 'Serie 1': 42, 'Serie 2': 32, 'Serie 3': 50 },
+    { name: 'Jan', Monterey: 18, Miami: 22, Brazil: 16 },
+    { name: 'Feb', Monterey: 24, Miami: 21, Brazil: 19 },
+    { name: 'Mar', Monterey: 28, Miami: 23, Brazil: 22 },
+    { name: 'Apr', Monterey: 33, Miami: 25, Brazil: 27 },
+    { name: 'May', Monterey: 37, Miami: 27, Brazil: 31 },
   ];
 
   const donutData = [
-    { name: 'Serie 1', value: 35 },
-    { name: 'Serie 2', value: 30 },
-    { name: 'Serie 3', value: 35 },
+    { name: 'Monterey Bay Shelf', value: 42 },
+    { name: 'Florida Reef Tract', value: 33 },
+    { name: 'Santos Basin Shelf', value: 25 },
   ];
 
   const barData = [
-    { name: 'Jan', value: 45 },
-    { name: 'Feb', value: 38 },
-    { name: 'Mar', value: 52 },
-    { name: 'Apr', value: 48 },
-    { name: 'May', value: 42 },
+    { name: 'Winter', value: 34 },
+    { name: 'Early Spring', value: 46 },
+    { name: 'Late Spring', value: 58 },
+    { name: 'Summer', value: 62 },
+    { name: 'Autumn', value: 39 },
   ];
 
   const comparisonData = [
-    { name: 'Elemento 1', Monterey: 30, Miami: 25, Brazil: 20 },
-    { name: 'Elemento 2', Monterey: 40, Miami: 35, Brazil: 30 },
-    { name: 'Elemento 3', Monterey: 55, Miami: 45, Brazil: 40 },
-    { name: 'Elemento 4', Monterey: 75, Miami: 60, Brazil: 55 },
-    { name: 'Elemento 5', Monterey: 95, Miami: 80, Brazil: 75 },
+    { name: 'Carbon Potential', Monterey: 95, Miami: 82, Brazil: 88 },
+    { name: 'Deployment Readiness', Monterey: 88, Miami: 74, Brazil: 69 },
+    { name: 'Ecological Co-benefits', Monterey: 91, Miami: 79, Brazil: 85 },
+    { name: 'Monitoring Confidence', Monterey: 86, Miami: 70, Brazil: 73 },
+    { name: 'Regulatory Alignment', Monterey: 79, Miami: 68, Brazil: 72 },
   ];
 
   const COLORS = ['#06b6d4', '#22d3ee', '#67e8f9'];
-  const sites = ['Monterey', 'Miami', 'Brazil'];
+  const regionOptions = Object.keys(REGION_SITE_COORDS);
+  const regionDisplayNames = {
+    Monterey: 'Monterey Bay Shelf',
+    Miami: 'Florida Reef Tract',
+    Brazil: 'Santos Basin Shelf'
+  };
+  
+  const ChatPanel = ({ containerClass = '', bodyHeightClass = 'h-56' }) => (
+    <div className={`bg-gradient-to-br from-orange-100 to-orange-200 rounded-2xl shadow-2xl flex flex-col ${containerClass}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+          <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+          </svg>
+          AI Assistant
+        </h3>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-xs text-slate-600">Online</span>
+        </div>
+      </div>
+      
+      <div className={`bg-white rounded-xl p-4 mb-3 overflow-y-auto ${bodyHeightClass}`}>
+        {chatMessages.map((msg, idx) => (
+          <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+            <div className={`inline-block max-w-[85%] px-4 py-2 rounded-lg ${
+              msg.role === 'user' 
+                ? 'bg-cyan-500 text-white rounded-br-none' 
+                : 'bg-slate-100 text-slate-800 rounded-bl-none'
+            }`}>
+              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+            </div>
+          </div>
+        ))}
+        {isChatLoading && (
+          <div className="text-left mb-3">
+            <div className="inline-block bg-slate-100 px-4 py-2 rounded-lg rounded-bl-none">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+          placeholder="Ask about ocean sites..."
+          disabled={isChatLoading}
+          className="flex-1 px-4 py-3 rounded-xl border-2 border-orange-300 focus:outline-none focus:border-orange-400 text-slate-700 disabled:opacity-50"
+        />
+        <button 
+          onClick={handleSendMessage}
+          disabled={isChatLoading || !chatInput.trim()}
+          className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 rounded-xl transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
   
   const projectTypes = [
     'Ocean Alkalinity Enhancement',
@@ -329,6 +425,42 @@ const OceanCarbonAI = () => {
     { name: 'NOAA Storm Database', type: 'Historical Storm Events', updated: '2024-11-08', url: 'https://www.ncdc.noaa.gov/stormevents/' },
   ];
 
+  const mapSites = useMemo(() => {
+    const baseSites = analysisResults && analysisResults.length > 0
+      ? analysisResults
+      : REGION_SITE_COORDS[selectedRegion] || REGION_SITE_COORDS['Monterey'];
+
+    return baseSites.map((site, idx) => ({
+      ...site,
+      score: site.score ?? Math.max(72, 92 - idx * 3),
+    }));
+  }, [analysisResults, selectedRegion]);
+
+  const mapCenter = useMemo(() => {
+    if (!mapSites.length) {
+      return [0, 0];
+    }
+    const avgLat = mapSites.reduce((sum, site) => sum + site.lat, 0) / mapSites.length;
+    const avgLon = mapSites.reduce((sum, site) => sum + site.lon, 0) / mapSites.length;
+    return [avgLat, avgLon];
+  }, [mapSites]);
+
+  const mapZoom = useMemo(() => {
+    if (mapSites.length <= 1) {
+      return 8;
+    }
+    const latitudes = mapSites.map(site => site.lat);
+    const longitudes = mapSites.map(site => site.lon);
+    const latRange = Math.max(...latitudes) - Math.min(...latitudes);
+    const lonRange = Math.max(...longitudes) - Math.min(...longitudes);
+    const maxRange = Math.max(latRange, lonRange);
+
+    if (maxRange < 0.5) return 11;
+    if (maxRange < 2) return 8;
+    if (maxRange < 6) return 6;
+    return 4;
+  }, [mapSites]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Header */}
@@ -359,7 +491,7 @@ const OceanCarbonAI = () => {
             
             {showSiteDropdown && (
               <div className="absolute top-full mt-2 bg-white border-2 border-slate-200 rounded-lg shadow-lg z-10 min-w-[200px]">
-                {sites.map(site => (
+                {regionOptions.map(site => (
                   <button
                     key={site}
                     onClick={() => {
@@ -439,7 +571,7 @@ const OceanCarbonAI = () => {
             <input 
               type="range" 
               min="10" 
-              max="500" 
+              max="20" 
               value={numSites}
               onChange={(e) => setNumSites(e.target.value)}
               className="w-32"
@@ -473,21 +605,33 @@ const OceanCarbonAI = () => {
               {/* Radar Chart */}
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex justify-center mb-2">
-                  {COLORS.map((color, i) => (
-                    <div key={i} className="flex items-center mr-4">
-                      <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: color }}></div>
-                      <span className="text-sm text-slate-600">Serie {i + 1}</span>
+                  {regionOptions.map((region, i) => (
+                    <div key={region} className="flex items-center mr-4">
+                      <div
+                        className="w-3 h-3 rounded-full mr-2"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      ></div>
+                      <span className="text-sm text-slate-600">
+                        {regionDisplayNames[region] || region}
+                      </span>
                     </div>
                   ))}
                 </div>
                 <ResponsiveContainer width="100%" height={250}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="#cbd5e1" />
-                    <PolarAngleAxis dataKey="elemento" tick={{ fill: '#64748b', fontSize: 11 }} />
+                    <PolarAngleAxis dataKey="parameter" tick={{ fill: '#64748b', fontSize: 11 }} />
                     <PolarRadiusAxis angle={90} domain={[0, 10]} tick={{ fill: '#64748b', fontSize: 11 }} />
-                    <Radar name="Serie 1" dataKey="Serie 1" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.3} />
-                    <Radar name="Serie 2" dataKey="Serie 2" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.3} />
-                    <Radar name="Serie 3" dataKey="Serie 3" stroke={COLORS[2]} fill={COLORS[2]} fillOpacity={0.3} />
+                    {regionOptions.map((region, i) => (
+                      <Radar
+                        key={region}
+                        name={regionDisplayNames[region] || region}
+                        dataKey={region}
+                        stroke={COLORS[i % COLORS.length]}
+                        fill={COLORS[i % COLORS.length]}
+                        fillOpacity={0.3}
+                      />
+                    ))}
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
@@ -495,10 +639,15 @@ const OceanCarbonAI = () => {
               {/* Area Chart */}
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex justify-center mb-2">
-                  {COLORS.map((color, i) => (
-                    <div key={i} className="flex items-center mr-4">
-                      <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: color }}></div>
-                      <span className="text-sm text-slate-600">Serie {i + 1}</span>
+                  {regionOptions.map((region, i) => (
+                    <div key={region} className="flex items-center mr-4">
+                      <div
+                        className="w-3 h-3 rounded-full mr-2"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      ></div>
+                      <span className="text-sm text-slate-600">
+                        {regionDisplayNames[region] || region}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -508,9 +657,16 @@ const OceanCarbonAI = () => {
                     <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
                     <Tooltip />
-                    <Area type="monotone" dataKey="Serie 3" stackId="1" stroke={COLORS[2]} fill={COLORS[2]} />
-                    <Area type="monotone" dataKey="Serie 2" stackId="1" stroke={COLORS[1]} fill={COLORS[1]} />
-                    <Area type="monotone" dataKey="Serie 1" stackId="1" stroke={COLORS[0]} fill={COLORS[0]} />
+                    {regionOptions.map((region, i) => (
+                      <Area
+                        key={region}
+                        type="monotone"
+                        dataKey={region}
+                        stackId="1"
+                        stroke={COLORS[i % COLORS.length]}
+                        fill={COLORS[i % COLORS.length]}
+                      />
+                    ))}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -518,10 +674,15 @@ const OceanCarbonAI = () => {
               {/* Line Chart */}
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex justify-center mb-2">
-                  {COLORS.map((color, i) => (
-                    <div key={i} className="flex items-center mr-4">
-                      <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: color }}></div>
-                      <span className="text-sm text-slate-600">Serie {i + 1}</span>
+                  {regionOptions.map((region, i) => (
+                    <div key={region} className="flex items-center mr-4">
+                      <div
+                        className="w-3 h-3 rounded-full mr-2"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      ></div>
+                      <span className="text-sm text-slate-600">
+                        {regionDisplayNames[region] || region}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -531,9 +692,16 @@ const OceanCarbonAI = () => {
                     <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="Serie 1" stroke={COLORS[0]} strokeWidth={2} dot={{ fill: COLORS[0], r: 4 }} />
-                    <Line type="monotone" dataKey="Serie 2" stroke={COLORS[1]} strokeWidth={2} dot={{ fill: COLORS[1], r: 4 }} />
-                    <Line type="monotone" dataKey="Serie 3" stroke={COLORS[2]} strokeWidth={2} dot={{ fill: COLORS[2], r: 4 }} />
+                    {regionOptions.map((region, i) => (
+                      <Line
+                        key={region}
+                        type="monotone"
+                        dataKey={region}
+                        stroke={COLORS[i % COLORS.length]}
+                        strokeWidth={2}
+                        dot={{ fill: COLORS[i % COLORS.length], r: 4 }}
+                      />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -637,10 +805,15 @@ const OceanCarbonAI = () => {
               <div className="bg-white rounded-xl shadow-md p-8">
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Site Comparison</h2>
                 <div className="flex justify-center mb-4">
-                  {sites.map((site, i) => (
-                    <div key={i} className="flex items-center mr-6">
-                      <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: COLORS[i] }}></div>
-                      <span className="font-medium text-slate-700">{site}</span>
+                  {regionOptions.map((site, i) => (
+                    <div key={site} className="flex items-center mr-6">
+                      <div
+                        className="w-4 h-4 rounded-full mr-2"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      ></div>
+                      <span className="font-medium text-slate-700">
+                        {regionDisplayNames[site] || site}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -817,99 +990,99 @@ const OceanCarbonAI = () => {
           )}
 
           {/* Map Section */}
-          <div className="bg-white rounded-xl shadow-md overflow-hidden" style={{ height: '500px' }}>
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 via-teal-50 to-green-100 relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">🗺️</div>
-                  <h3 className="text-2xl font-bold text-slate-700 mb-2">Interactive Map</h3>
-                  <p className="text-slate-600 max-w-md">
-                    This area will display your satellite map with heatmap overlay showing site suitability scores.
-                    Top-ranked sites will appear as numbered markers.
-                  </p>
-                  <div className="mt-6 flex gap-4 justify-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                      <span className="text-sm text-slate-600">Low Suitability</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-                      <span className="text-sm text-slate-600">Medium</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                      <span className="text-sm text-slate-600">High Suitability</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Interface */}
-        <div className="fixed bottom-6 right-6 w-96 z-50">
-          <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-2xl shadow-2xl p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-                </svg>
-                AI Assistant
-              </h3>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-slate-600">Online</span>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-4 mb-3 h-64 overflow-y-auto">
-              {chatMessages.map((msg, idx) => (
-                <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                  <div className={`inline-block max-w-[85%] px-4 py-2 rounded-lg ${
-                    msg.role === 'user' 
-                      ? 'bg-cyan-500 text-white rounded-br-none' 
-                      : 'bg-slate-100 text-slate-800 rounded-bl-none'
-                  }`}>
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                  </div>
-                </div>
-              ))}
-              {isChatLoading && (
-                <div className="text-left mb-3">
-                  <div className="inline-block bg-slate-100 px-4 py-2 rounded-lg rounded-bl-none">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Ask about ocean sites..."
-                disabled={isChatLoading}
-                className="flex-1 px-4 py-3 rounded-xl border-2 border-orange-300 focus:outline-none focus:border-orange-400 text-slate-700 disabled:opacity-50"
+          <div className="bg-white rounded-xl shadow-md overflow-hidden relative" style={{ height: '500px' }}>
+            <MapContainer
+              center={mapCenter}
+              zoom={mapZoom}
+              scrollWheelZoom={false}
+              className="w-full h-full"
+              style={{ height: '100%', width: '100%' }}
+              preferCanvas
+            >
+              <MapViewUpdater center={mapCenter} zoom={mapZoom} />
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution="&copy; OpenStreetMap contributors"
               />
-              <button 
-                onClick={handleSendMessage}
-                disabled={isChatLoading || !chatInput.trim()}
-                className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 rounded-xl transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
+              {mapSites.map((site, idx) => {
+                const color = getSuitabilityColor(site.score);
+                return (
+                  <CircleMarker
+                    key={`${site.name}-${idx}`}
+                    center={[site.lat, site.lon]}
+                    radius={getMarkerRadius(site.score)}
+                    pathOptions={{
+                      color,
+                      fillColor: color,
+                      weight: 2,
+                      opacity: 0.9,
+                      fillOpacity: 0.6,
+                    }}
+                  >
+                    <LeafletTooltip direction="top" offset={[0, -2]} opacity={1} sticky>
+                      <div className="text-sm">
+                        <p className="font-semibold text-slate-800">
+                          {site.rank ? `#${site.rank} ${site.name}` : site.name}
+                        </p>
+                        <p className="text-slate-600">
+                          Score: {site.score ? `${site.score}/100` : 'Pending'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {site.lat.toFixed(2)}, {site.lon.toFixed(2)}
+                        </p>
+                        {site.analysis?.strengths?.length ? (
+                          <p className="text-xs text-slate-500 mt-1">
+                            {site.analysis.strengths.slice(0, 2).join(', ')}
+                          </p>
+                        ) : null}
+                      </div>
+                    </LeafletTooltip>
+                  </CircleMarker>
+                );
+              })}
+            </MapContainer>
+
+            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur rounded-xl shadow-lg p-4 w-64 space-y-3">
+              <div>
+                <p className="text-xs uppercase text-slate-500 tracking-wide">Region focus</p>
+                <p className="font-semibold text-slate-800">{selectedRegion}</p>
+                <p className="text-xs text-slate-500">{mapSites.length} candidate sites</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#16a34a]"></span>
+                  <span className="text-sm text-slate-600">High suitability (90+)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#facc15]"></span>
+                  <span className="text-sm text-slate-600">Medium (80-89)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#ef4444]"></span>
+                  <span className="text-sm text-slate-600">Monitor (&lt;80)</span>
+                </div>
+              </div>
+              <div className="border-t border-slate-200 pt-3">
+                {analysisResults?.length ? (
+                  <>
+                    <p className="text-xs uppercase text-slate-500 tracking-wide">Top-ranked site</p>
+                    <p className="font-semibold text-slate-800">{analysisResults[0]?.name}</p>
+                    <p className="text-xs text-slate-500">Score {analysisResults[0]?.score}/100</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Run the AI analysis to refresh suitability scores from the latest model output.
+                  </p>
+                )}
+              </div>
             </div>
+
           </div>
         </div>
+      </div>
+      {/* Global Chat Interface */}
+      <div className="fixed top-6 right-6 w-96 z-50 pointer-events-auto">
+        <ChatPanel containerClass="p-6 max-h-[80vh]" bodyHeightClass="max-h-[48vh]" />
       </div>
     </div>
   );
